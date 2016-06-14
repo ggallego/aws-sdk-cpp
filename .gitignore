@@ -30,6 +30,13 @@ _build
 build
 _build_*
 cmake/
+#-gmg,ini
+*.cmake
+Makefile
+CMakeCache.txt
+CMakeFiles/
+#-gmg,end
+
 
 # Compiled Object files
 *.slo
@@ -74,3 +81,12 @@ code-generation/generator/target/
 
 #config output
 aws-cpp-sdk-core/include/aws/core/SDKConfig.h
+
+#test execution files
+run*IntegrationTests
+run*ManagementTests
+run*UnitTests
+aws_sdk_*.log
+
+
+

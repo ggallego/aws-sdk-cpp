@@ -188,6 +188,6 @@ TEST_F(ExtendedQueueOperationTest, TestFailSendReceiveLargeMessage)
     EXPECT_TRUE(SQSErrors::INVALID_PARAMETER_VALUE == error);
 
     Aws::String errorMessage = sendMessageOutcome.GetError().GetMessage();
+    EXPECT_TRUE(errorMessage.find(std::to_string(QUEUE_SIZE_LIMIT).c_str()) != std::string::npos);
     // GetMessage(): One or more parameters are invalid. Reason: Message must be shorter than 262144 bytes.
-    EXPECT_TRUE(errorMessage.find("2") != std::string::npos);
 }

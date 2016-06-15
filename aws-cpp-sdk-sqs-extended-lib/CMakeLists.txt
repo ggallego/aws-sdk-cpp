@@ -1,69 +1,59 @@
 cmake_minimum_required(VERSION 2.6)
 project(aws-cpp-sdk-sqs-extended-lib)
 
-  file(GLOB AWS_SQS_HEADERS
-    "include/aws/sqs/*.h"
+  file(GLOB AWS_SQS_EXTENDED_LIB_HEADERS
+    "include/aws/sqs/extendedlib/*.h"
   )
 
-  file(GLOB AWS_SQS_MODEL_HEADERS
-    "include/aws/sqs/model/*.h"
-  )
-
-  file(GLOB AWS_SQS_SOURCE
+  file(GLOB AWS_SQS_EXTENDED_LIB_SOURCE
     "source/*.cpp"
   )
 
-  file(GLOB AWS_SQS_MODEL_SOURCE
-    "source/model/*.cpp"
+  file(GLOB SQS_EXTENDED_LIB_UNIFIED_HEADERS
+    ${AWS_SQS_EXTENDED_LIB_HEADERS}
   )
 
-  file(GLOB SQS_UNIFIED_HEADERS
-    ${AWS_SQS_HEADERS}
-    ${AWS_SQS_MODEL_HEADERS}
-  )
-
-  file(GLOB SQS_UNITY_SRC
-    ${AWS_SQS_SOURCE}
-    ${AWS_SQS_MODEL_SOURCE}
+  file(GLOB SQS_EXTENDED_LIB_UNITY_SRC
+    ${AWS_SQS_EXTENDED_LIB_SOURCE}
   )
 
   if(ENABLE_UNITY_BUILD)
-    enable_unity_build("SQS" SQS_UNITY_SRC)
+    enable_unity_build("SQS_EXTENDED_LIB" SQS_EXTENDED_LIB_UNITY_SRC)
   endif()
 
-  file(GLOB SQS_SRC
-    ${SQS_UNIFIED_HEADERS}
-    ${SQS_UNITY_SRC}
+  file(GLOB SQS_EXTENDED_LIB_SRC
+    ${SQS_EXTENDED_LIB_UNIFIED_HEADERS}
+    ${SQS_EXTENDED_LIB_UNITY_SRC}
   )
 
   if(WIN32)
     #if we are compiling for visual studio, create a sane directory tree.
     if(MSVC)
-      source_group("Header Files\\aws\\sqs" FILES ${AWS_SQS_HEADERS})
-      source_group("Header Files\\aws\\sqs\\model" FILES ${AWS_SQS_MODEL_HEADERS})
-      source_group("Source Files" FILES ${AWS_SQS_SOURCE})
-      source_group("Source Files\\model" FILES ${AWS_SQS_MODEL_SOURCE})
+      source_group("Header Files\\aws\\sqs\\extendedlib" FILES ${AWS_SQS_EXTENDED_LIB_HEADERS})
+      source_group("Source Files" FILES ${AWS_SQS_EXTENDED_LIB_SOURCE})
     endif(MSVC)
   endif()
 
-  set(SQS_INCLUDES
+  set(SQS_EXTENDED_LIB_INCLUDES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/"
     "${CORE_DIR}/include/"
+    "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-sqs/include/"
+    "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-s3/include/"
   )
 
-  include_directories(${SQS_INCLUDES})
+  include_directories(${SQS_EXTENDED_LIB_INCLUDES})
 
   if(MSVC AND BUILD_SHARED_LIBS)
-    add_definitions("-DAWS_SQS_EXPORTS")
+    add_definitions("-DAWS_SQS_EXTENDED_LIB_EXPORTS")
   endif()
 
-  add_library(aws-cpp-sdk-sqs-extended-lib ${LIBTYPE} ${SQS_SRC})
+  add_library(aws-cpp-sdk-sqs-extended-lib ${LIBTYPE} ${SQS_EXTENDED_LIB_SRC})
 
   target_include_directories(aws-cpp-sdk-sqs-extended-lib PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
   
-  target_link_libraries(aws-cpp-sdk-sqs-extended-lib aws-cpp-sdk-core)
+  target_link_libraries(aws-cpp-sdk-sqs-extended-lib aws-cpp-sdk-core aws-cpp-sdk-sqs aws-cpp-sdk-s3)
 
   #uncomment when unit tests are automatically generated
   #add_test(run${metadata.namespace}Tests run${metadata.namespace}Tests)
@@ -80,6 +70,5 @@ project(aws-cpp-sdk-sqs-extended-lib)
                RUNTIME DESTINATION bin/${SDK_INSTALL_BINARY_PREFIX}/${PLATFORM_INSTALL_QUALIFIER}/\${CMAKE_INSTALL_CONFIG_NAME})
   endif()
 
-  install (FILES ${AWS_SQS_HEADERS} DESTINATION include/aws/sqs-extended-lib)
-  install (FILES ${AWS_SQS_MODEL_HEADERS} DESTINATION include/aws/sqs-extended-lib/model)
+  install (FILES ${AWS_SQS_EXTENDED_LIB_HEADERS} DESTINATION include/aws/sqs/extended-lib)
 

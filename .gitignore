@@ -88,5 +88,8 @@ run*ManagementTests
 run*UnitTests
 aws_sdk_*.log
 
+#eclipse config files
+.cproject
+.project
 
 

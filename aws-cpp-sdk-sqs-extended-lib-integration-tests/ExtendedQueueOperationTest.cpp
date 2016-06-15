@@ -138,7 +138,7 @@ protected:
 };
 } // anonymous namespace
 
-TEST_F(ExtendedQueueOperationTest, TestSendReceiveSmallMessage)
+TEST_F(ExtendedQueueOperationTest, TestSuccessSendReceiveSmallMessage)
 {
 
     Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody(QUEUE_SIZE_LIMIT-10);
@@ -173,7 +173,7 @@ TEST_F(ExtendedQueueOperationTest, TestSendReceiveSmallMessage)
     EXPECT_EQ(0uL, receiveMessageOutcome.GetResult().GetMessages().size());
 }
 
-TEST_F(ExtendedQueueOperationTest, TestSendReceiveLargeMessage)
+TEST_F(ExtendedQueueOperationTest, TestFailSendReceiveLargeMessage)
 {
 
     Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody(QUEUE_SIZE_LIMIT+10);
@@ -184,26 +184,10 @@ TEST_F(ExtendedQueueOperationTest, TestSendReceiveLargeMessage)
 
     SendMessageOutcome sendMessageOutcome = sqsClient->SendMessage(sendMessageRequest);
 
-    ASSERT_TRUE(sendMessageOutcome.IsSuccess());
-    EXPECT_TRUE(sendMessageOutcome.GetResult().GetMessageId().length() > 0);
+    SQSErrors error = sendMessageOutcome.GetError().GetErrorType();
+    EXPECT_TRUE(SQSErrors::INVALID_PARAMETER_VALUE == error);
 
-    ReceiveMessageRequest receiveMessageRequest;
-    receiveMessageRequest.SetMaxNumberOfMessages(1);
-    receiveMessageRequest.SetQueueUrl(queueUrl);
-
-    ReceiveMessageOutcome receiveMessageOutcome = sqsClient->ReceiveMessage(receiveMessageRequest);
-    ASSERT_TRUE(receiveMessageOutcome.IsSuccess());
-    ReceiveMessageResult receiveMessageResult = receiveMessageOutcome.GetResult();
-    ASSERT_EQ(1uL, receiveMessageResult.GetMessages().size());
-    EXPECT_EQ(messageBody, receiveMessageResult.GetMessages()[0].GetBody());
-
-    DeleteMessageRequest deleteMessageRequest;
-    deleteMessageRequest.SetQueueUrl(queueUrl);
-    deleteMessageRequest.SetReceiptHandle(receiveMessageResult.GetMessages()[0].GetReceiptHandle());
-
-    DeleteMessageOutcome deleteMessageOutcome = sqsClient->DeleteMessage(deleteMessageRequest);
-    ASSERT_TRUE(deleteMessageOutcome.IsSuccess());
-
-    receiveMessageOutcome = sqsClient->ReceiveMessage(receiveMessageRequest);
-    EXPECT_EQ(0uL, receiveMessageOutcome.GetResult().GetMessages().size());
+    Aws::String errorMessage = sendMessageOutcome.GetError().GetMessage();
+    // GetMessage(): One or more parameters are invalid. Reason: Message must be shorter than 262144 bytes.
+    EXPECT_TRUE(errorMessage.find("2") != std::string::npos);
 }

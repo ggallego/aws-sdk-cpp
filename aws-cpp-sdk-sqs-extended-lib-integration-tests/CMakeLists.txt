@@ -33,4 +33,4 @@ else()
 endif()
 
 target_link_libraries(runSqsExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)
-copyDlls(runSqsExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)
+copyDlls(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)

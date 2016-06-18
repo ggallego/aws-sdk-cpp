@@ -14,7 +14,6 @@
  */
 
 #pragma once
-
 #include <aws/core/utils/memory/stl/AWSString.h>
 #include <aws/s3/S3Client.h>
 
@@ -28,22 +27,27 @@ namespace Aws
       class SQSExtendedClientConfiguration
       {
 
-      public:
-//      private:
-	std::shared_ptr<S3::S3Client> s3Client;
+      private:
+	std::shared_ptr<Aws::S3::S3Client> s3Client;
 	Aws::String s3BucketName;
+        unsigned messageSizeThreshold;
 	bool largePayloadSupport;
 	bool alwaysThroughS3;
-	int messageSizeThreshold;
 
-//      public:
+      public:
 	SQSExtendedClientConfiguration ();
-	virtual	~SQSExtendedClientConfiguration ();
 
-	virtual void SetLargePayloadSupportEnabled () const;
-	virtual void SetLargePayloadSupportDisabled () const;
-	virtual void SetAlwaysThroughS3Enabled () const;
-	virtual void SetAlwaysThroughS3Disabled () const;
+        virtual void SetLargePayloadSupportEnabled (const std::shared_ptr<Aws::S3::S3Client> s3Client, const Aws::String s3BucketName);
+	virtual void SetLargePayloadSupportDisabled ();
+        virtual bool IsLargePayloadSupportEnabled() const;
+
+        virtual void SetAlwaysThroughS3Enabled ();
+	virtual void SetAlwaysThroughS3Disabled ();
+	virtual bool IsAlwaysThroughS3 () const;
+
+        virtual std::shared_ptr<Aws::S3::S3Client> GetS3Client () const;
+	virtual Aws::String GetS3BucketName () const;
+        virtual unsigned GetMessageSizeThreshold () const;
 
       };
     } // namespace extendedLib

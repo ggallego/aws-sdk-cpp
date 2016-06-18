@@ -14,9 +14,9 @@
  */
 
 #pragma once
-
-#include <aws/core/utils/memory/stl/AWSString.h>
+#include <aws/sqs/SQS_EXPORTS.h>
 #include <aws/sqs/extendedlib/SQSExtendedClientConfiguration.h>
+#include <aws/sqs/model/MessageAttributeValue.h>
 #include <aws/s3/S3Client.h>
 #include <aws/sqs/SQSClient.h>
 
@@ -27,16 +27,24 @@ namespace Aws
     namespace ExtendedLib
     {
 
-      class SQSExtendedClient : public SQSClient
+      class AWS_SQS_API SQSExtendedClient : public SQSClient
       {
+
       private:
-	std::shared_ptr<SQS::SQSClient> sqsClient;
-	std::shared_ptr<SQSExtendedClientConfiguration> sqsConfig;
+        std::shared_ptr<SQS::SQSClient> sqsClient;
+        std::shared_ptr<SQSExtendedClientConfiguration> sqsConfig;
+
+        virtual bool IsLargeMessage (const Model::SendMessageRequest& request) const;
+        virtual unsigned GetMsgAttributesSize(const Aws::Map<Aws::String, Model::MessageAttributeValue>& messageAttributes) const;
+        virtual Model::SendMessageRequest StoreMessageInS3 (const Model::SendMessageRequest& request) const;
 
       public:
-	SQSExtendedClient (
-	    const std::shared_ptr<SQSClient>& client,
-	    const std::shared_ptr<SQSExtendedClientConfiguration>& config);
+        SQSExtendedClient (const std::shared_ptr<SQSClient>& client,
+            const std::shared_ptr<SQSExtendedClientConfiguration>& config);
+
+        virtual Model::SendMessageOutcome
+        SendMessage (const Model::SendMessageRequest& request) const;
+
       };
 
     } // namespace extendedLib

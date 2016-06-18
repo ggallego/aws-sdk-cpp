@@ -21,27 +21,42 @@ using namespace Aws::SQS::ExtendedLib;
 SQSExtendedClientConfiguration::SQSExtendedClientConfiguration () :
   s3Client(nullptr),
   s3BucketName("bucket"),
+  messageSizeThreshold(262144),
   largePayloadSupport(true),
-  alwaysThroughS3(false),
-  messageSizeThreshold(262144)
+  alwaysThroughS3(false)
 {
 }
 
-SQSExtendedClientConfiguration::~SQSExtendedClientConfiguration ()
+
+void SQSExtendedClientConfiguration::SetLargePayloadSupportEnabled (const std::shared_ptr<Aws::S3::S3Client> _s3Client, const Aws::String _s3BucketName)
 {
+  s3Client = _s3Client;
+  s3BucketName = _s3BucketName;
+  largePayloadSupport = true;
 }
 
-void SQSExtendedClientConfiguration::SetLargePayloadSupportEnabled () const
+void SQSExtendedClientConfiguration::SetLargePayloadSupportDisabled ()
 {
-}
-void SQSExtendedClientConfiguration::SetLargePayloadSupportDisabled () const
-{
-}
-
-void SQSExtendedClientConfiguration::SetAlwaysThroughS3Enabled () const
-{
+  s3Client = nullptr;
+  s3BucketName = "";
+  largePayloadSupport = false;
 }
 
-void SQSExtendedClientConfiguration::SetAlwaysThroughS3Disabled () const
-{
-}
+bool SQSExtendedClientConfiguration::IsLargePayloadSupportEnabled() const { return largePayloadSupport; }
+
+// ---
+
+void SQSExtendedClientConfiguration::SetAlwaysThroughS3Enabled () { alwaysThroughS3 = true; }
+
+void SQSExtendedClientConfiguration::SetAlwaysThroughS3Disabled () { alwaysThroughS3 = false; }
+
+bool SQSExtendedClientConfiguration::IsAlwaysThroughS3 () const { return alwaysThroughS3; }
+
+// ---
+
+std::shared_ptr<Aws::S3::S3Client> SQSExtendedClientConfiguration::GetS3Client () const { return s3Client; }
+
+Aws::String SQSExtendedClientConfiguration::GetS3BucketName () const { return s3BucketName; }
+
+unsigned SQSExtendedClientConfiguration::GetMessageSizeThreshold () const { return messageSizeThreshold; }
+

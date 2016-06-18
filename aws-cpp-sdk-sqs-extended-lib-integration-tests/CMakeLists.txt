@@ -27,10 +27,10 @@ endif()
 enable_testing()
 
 if(PLATFORM_ANDROID AND BUILD_SHARED_LIBS)
-    add_library(runSqsExtendedLibIntegrationTests ${LIBTYPE} ${AWS_SQS_EXTENDED_LIB_INTEGRATION_TESTS_SRC})
+    add_library(runSQSExtendedLibIntegrationTests ${LIBTYPE} ${AWS_SQS_EXTENDED_LIB_INTEGRATION_TESTS_SRC})
 else()
-    add_executable(runSqsExtendedLibIntegrationTests ${AWS_SQS_EXTENDED_LIB_INTEGRATION_TESTS_SRC})
+    add_executable(runSQSExtendedLibIntegrationTests ${AWS_SQS_EXTENDED_LIB_INTEGRATION_TESTS_SRC})
 endif()
 
-target_link_libraries(runSqsExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)
+target_link_libraries(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)
 copyDlls(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)

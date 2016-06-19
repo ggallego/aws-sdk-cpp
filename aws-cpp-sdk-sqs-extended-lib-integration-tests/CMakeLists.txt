@@ -15,6 +15,9 @@ project(aws-cpp-sdk-sqs-extended-lib-integration-tests)
 set(AWS_SQS_EXTENDED_LIB_INTEGRATION_TEST_APPLICATION_INCLUDES
   "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-core/include/"
   "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-sqs-extended-lib/include/"
+  "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-cognito-identity/include/"
+  "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-access-management/include/"  
+  "${AWS_NATIVE_SDK_ROOT}/aws-cpp-sdk-iam/include/"
   "${AWS_NATIVE_SDK_ROOT}/testing-resources/include/"
 )
 
@@ -32,5 +35,5 @@ else()
     add_executable(runSQSExtendedLibIntegrationTests ${AWS_SQS_EXTENDED_LIB_INTEGRATION_TESTS_SRC})
 endif()
 
-target_link_libraries(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)
-copyDlls(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib testing-resources)
+target_link_libraries(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib aws-cpp-sdk-access-management aws-cpp-sdk-iam aws-cpp-sdk-cognito-identity testing-resources)
+copyDlls(runSQSExtendedLibIntegrationTests aws-cpp-sdk-core aws-cpp-sdk-sqs-extended-lib aws-cpp-sdk-access-management aws-cpp-sdk-iam aws-cpp-sdk-cognito-identity testing-resources)

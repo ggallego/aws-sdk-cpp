@@ -42,8 +42,9 @@ namespace Aws
         SQSExtendedClient (const std::shared_ptr<SQSClient>& client,
             const std::shared_ptr<SQSExtendedClientConfiguration>& config);
 
-        virtual Model::SendMessageOutcome
-        SendMessage (const Model::SendMessageRequest& request) const;
+        virtual Model::SendMessageOutcome SendMessage (const Model::SendMessageRequest& request) const;
+        virtual Model::ReceiveMessageOutcome ReceiveMessage(const Model::ReceiveMessageRequest& request) const;
+        virtual Model::DeleteMessageOutcome DeleteMessage(const Model::DeleteMessageRequest& request) const;
 
       };
 

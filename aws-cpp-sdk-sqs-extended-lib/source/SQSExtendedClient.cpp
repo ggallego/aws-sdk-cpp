@@ -51,6 +51,7 @@
 #include <aws/sqs/extendedlib/SQSExtendedClientConfiguration.h>
 #include <aws/sqs/extendedlib/SQSLargeMessageS3Pointer.h>
 #include <aws/s3/model/PutObjectRequest.h>
+#include <aws/s3/model/GetObjectRequest.h>
 #include <aws/core/utils/json/JsonSerializer.h>
 
 using namespace Aws;
@@ -68,6 +69,8 @@ using namespace Aws::Utils::Json;
 //static const char* SERVICE_NAME = "sqs";
 static const char* ALLOCATION_TAG = "SQSExtendedClient";
 static const char* RESERVED_ATTRIBUTE_NAME = "SQSLargePayloadSize";
+static const char* S3_BUCKET_NAME_MARKER = "-..s3BucketName..-";
+static const char* S3_KEY_MARKER = "-..s3Key..-";
 
 SQSExtendedClient::SQSExtendedClient (const std::shared_ptr<SQSClient>& client,
     const std::shared_ptr<SQSExtendedClientConfiguration>& config) :
@@ -75,11 +78,11 @@ SQSExtendedClient::SQSExtendedClient (const std::shared_ptr<SQSClient>& client,
 {
 }
 
+// ---
+
 SendMessageOutcome
 SQSExtendedClient::SendMessage (const SendMessageRequest& request) const
 {
-  //request.GetRequestClientOptions ().AppendUserAgent (USER_AGENT_HEADER);
-
   if (!sqsConfig->IsLargePayloadSupportEnabled ())
     return SQSClient::SendMessage (request);
 
@@ -90,6 +93,81 @@ SQSExtendedClient::SendMessage (const SendMessageRequest& request) const
 
   return SQSClient::SendMessage (request);
 }
+
+ReceiveMessageOutcome
+SQSExtendedClient::ReceiveMessage(const ReceiveMessageRequest& request) const
+{
+  if (!sqsConfig->IsLargePayloadSupportEnabled())
+    return SQSClient::ReceiveMessage(request);
+
+  ReceiveMessageRequest reqWithS3Support = request;
+  reqWithS3Support.AddMessageAttributeNames(RESERVED_ATTRIBUTE_NAME);
+
+  ReceiveMessageOutcome outcome = SQSClient::ReceiveMessage(reqWithS3Support);
+  ReceiveMessageResult result = outcome.GetResult();
+
+  Aws::Vector<Message> rebuildedMessages;
+  for (auto message : result.GetMessages())
+    {
+
+      Aws::Map<Aws::String, MessageAttributeValue> messageAttributes = message.GetMessageAttributes();
+      if (messageAttributes.find(RESERVED_ATTRIBUTE_NAME) != messageAttributes.end()) {
+
+          Aws::String messageBody = message.GetBody();
+
+          // unjsonize object
+          SQSLargeMessageS3Pointer s3Pointer = JsonValue(messageBody);
+          Aws::String s3BucketName = s3Pointer.GetS3BucketName();
+          Aws::String s3Key = s3Pointer.GetS3Key();
+
+          // get payload from s3
+          GetObjectRequest getObjectRequest;
+          getObjectRequest.SetBucket(s3BucketName);
+          getObjectRequest.SetKey(s3Key);
+          GetObjectOutcome getObjectOutcome = sqsConfig->GetS3Client()->GetObject(getObjectRequest);
+
+          // set original body to message
+          Aws::StringStream originalBody;
+          originalBody << getObjectOutcome.GetResult().GetBody().rdbuf();
+          message.SetBody(originalBody.str());
+
+          // remove largepayload attribute from message
+          messageAttributes.erase(RESERVED_ATTRIBUTE_NAME);
+          message.SetMessageAttributes(messageAttributes);
+
+          // Embed s3 object pointer in the receipt handle.
+          Aws::String receiptHandle =
+                S3_BUCKET_NAME_MARKER + s3BucketName + S3_BUCKET_NAME_MARKER
+              + S3_KEY_MARKER + s3Key + S3_KEY_MARKER
+              + message.GetReceiptHandle();
+
+          message.SetReceiptHandle(receiptHandle);
+      }
+
+      rebuildedMessages.push_back(message);
+
+    }
+  result.SetMessages(rebuildedMessages);
+
+  return ReceiveMessageOutcome(result);
+}
+
+DeleteMessageOutcome SQSExtendedClient::DeleteMessage(const DeleteMessageRequest& request) const
+{
+  if (!sqsConfig->IsLargePayloadSupportEnabled())
+    return SQSClient::DeleteMessage(request);
+
+//  Aws::String receiptHandle = request.GetReceiptHandle();
+//  Aws::String origReceiptHandle = receiptHandle;
+//  if (SQSExtendedClient::IsS3ReceiptHandle(receiptHandle)) {
+//    SQSExtendedClient::deleteMessagePayloadFromS3(receiptHandle);
+//    origReceiptHandle = SQSExtendedClient::GetOrigReceiptHandle(receiptHandle);
+//  }
+//  request.SetReceiptHandle(origReceiptHandle);
+  return SQSClient::DeleteMessage(request);
+}
+
+// ---
 
 bool
 SQSExtendedClient::IsLargeMessage (const SendMessageRequest& request) const
@@ -142,14 +220,10 @@ SQSExtendedClient::GetMsgAttributesSize (
 {
   unsigned size = 0;
 
-  std::cout << "I haz attritubes ???" << std::endl;
-
-  for (auto each : messageAttributes)
+  for (auto attribute : messageAttributes)
     {
-      Aws::String key = each.first;
-      Model::MessageAttributeValue value = each.second;
-
-      std::cout << "I haz attritubes: " << key << std::endl;
+      Aws::String key = attribute.first;
+      Model::MessageAttributeValue value = attribute.second;
 
       // TODO: Test this with care
       size += key.size ();

@@ -27,7 +27,6 @@ SQSExtendedClientConfiguration::SQSExtendedClientConfiguration () :
 {
 }
 
-
 void SQSExtendedClientConfiguration::SetLargePayloadSupportEnabled (const std::shared_ptr<Aws::S3::S3Client> _s3Client, const Aws::String _s3BucketName)
 {
   s3Client = _s3Client;

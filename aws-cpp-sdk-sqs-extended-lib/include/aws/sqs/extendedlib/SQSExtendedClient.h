@@ -37,6 +37,7 @@ namespace Aws
         virtual bool IsLargeMessage (const Model::SendMessageRequest& request) const;
         virtual unsigned GetMsgAttributesSize(const Aws::Map<Aws::String, Model::MessageAttributeValue>& messageAttributes) const;
         virtual Model::SendMessageRequest StoreMessageInS3 (const Model::SendMessageRequest& request) const;
+        virtual Aws::String GetFromReceiptHandleByMarker(const Aws::String receiptHandle, const Aws::String marker) const;
 
       public:
         SQSExtendedClient (const std::shared_ptr<SQSClient>& client,

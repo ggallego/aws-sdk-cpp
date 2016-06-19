@@ -33,6 +33,7 @@
 #include <aws/sqs/model/RemovePermissionRequest.h>
 #include <aws/sqs/model/ListDeadLetterSourceQueuesRequest.h>
 #include <aws/s3/model/CreateBucketRequest.h>
+#include <aws/s3/model/DeleteBucketRequest.h>
 #include <aws/s3/model/HeadBucketRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/core/utils/Outcome.h>
@@ -67,10 +68,24 @@ static const unsigned QUEUE_SIZE_LIMIT = 262144;
 static const char* S3_BUCKET_NAME_MARKER = "-..s3BucketName..-";
 static const char* S3_KEY_MARKER = "-..s3Key..-";
 
-static const char* SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_BUCKET = "SmallMessageWithLargePayloadSupportEnabled";
+//static const char* SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_BUCKET = "SmallMessageWithLargePayloadSupportEnabled";
 static const char* SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_QUEUENAME = "SmallMessageWithLargePayloadSupportEnabled";
+
 static const char* LARGEMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_BUCKET = "LargeMessageWithLargePayloadSupportEnabled";
 static const char* LARGEMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_QUEUENAME = "LargeMessageWithLargePayloadSupportEnabled";
+
+//static const char* SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTEDISABLED_BUCKET = "SmallMessageWithLargePayloadSupportDisabled";
+static const char* SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTEDISABLED_QUEUENAME = "SmallMessageWithLargePayloadSupportDisabled";
+
+//static const char* LARGEMESSAGE_WITHLARGEPAYLOADSUPPORTEDISABLED_BUCKET = "LargeMessageWithLargePayloadSupportDisabled";
+static const char* LARGEMESSAGE_WITHLARGEPAYLOADSUPPORTEDISABLED_QUEUENAME = "LargeMessageWithLargePayloadSupportDisabled";
+
+static const char* SMALLMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_BUCKET = "SmallMessageWithAllwaysThroughS3Enabled";
+static const char* SMALLMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_QUEUENAME = "SmallMessageWithAllwaysThroughS3Enabled";
+
+static const char* LARGEMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_BUCKET = "LargeMessageWithAllwaysThroughS3Enabled";
+static const char* LARGEMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_QUEUENAME = "LargeMessageWithAllwaysThroughS3Enabled";
+
 
 namespace
 {
@@ -138,6 +153,14 @@ namespace
         return false;
 
       return WaitForBucketToPropagate(s3Client, bucketName);
+    }
+
+    DeleteBucketOutcome
+    DeleteBucket (const std::shared_ptr<S3Client> s3Client, const Aws::String bucketName)
+    {
+      DeleteBucketRequest deleteBucketRequest;
+      deleteBucketRequest.SetBucket(bucketName);
+      return s3Client->DeleteBucket(deleteBucketRequest);
     }
 
     Aws::String
@@ -239,7 +262,8 @@ namespace
     GetFromReceiptHandleByMarker(const Aws::String receiptHandle, const Aws::String marker) {
       int firstOccurence = receiptHandle.find(marker);
       int secondOccurence = receiptHandle.find(marker, firstOccurence + 1);
-      return receiptHandle.substr(firstOccurence + marker.length(), secondOccurence);
+      int receiptHandleLenght = secondOccurence - firstOccurence - marker.length();
+      return receiptHandle.substr(firstOccurence + marker.length(), receiptHandleLenght);
     }
 
   };
@@ -247,12 +271,8 @@ namespace
 
 TEST_F(ExtendedQueueOperationTest, TestSmallMessageWithLargePayloadSupportEnabled)
 {
-  // build a bucket, an extended sqs config, an extended sqs client a queue and message body
-  Aws::String s3BucketName = accountId + "_" + SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_BUCKET + "_" + timeStamp;
-  CreateBucket(s3Client, s3BucketName);
-
+  // build an extended sqs config, an extended sqs client and a queue
   auto sqsConfig = Aws::MakeShared<SQSExtendedClientConfiguration> (ALLOCATION_TAG);
-  sqsConfig->SetLargePayloadSupportEnabled(s3Client, s3BucketName);
 
   std::shared_ptr<SQSClient> sqsClient = Aws::MakeShared<SQSExtendedClient> (ALLOCATION_TAG, sqsStdClient, sqsConfig);
 
@@ -301,7 +321,7 @@ TEST_F(ExtendedQueueOperationTest, TestLargeMessageWithLargePayloadSupportEnable
 
   Aws::String queueUrl = CreateQueue (sqsClient, LARGEMESSAGE_WITHLARGEPAYLOADSUPPORTENABLED_QUEUENAME);
 
-  // prepare a small payload
+  // prepare a large payload
   Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody (QUEUE_SIZE_LIMIT + 1000);
 
   // send message
@@ -338,39 +358,196 @@ TEST_F(ExtendedQueueOperationTest, TestLargeMessageWithLargePayloadSupportEnable
   // delete queue
   DeleteQueueOutcome deleteQ = DeleteQueue(sqsClient, queueUrl);
   ASSERT_TRUE(deleteQ.IsSuccess());
+
+  //delete bucket
+  DeleteBucketOutcome deleteB = DeleteBucket(s3Client, s3BucketName);
+  ASSERT_TRUE(deleteB.IsSuccess());
 }
 
-/*
 TEST_F(ExtendedQueueOperationTest, TestSmallMessageWithLargePayloadSupportDisabled)
 {
+  // build an extended sqs config, an extended sqs client and a queue
+  auto sqsConfig = Aws::MakeShared<SQSExtendedClientConfiguration> (ALLOCATION_TAG);
+
+  std::shared_ptr<SQSClient> sqsClient = Aws::MakeShared<SQSExtendedClient> (ALLOCATION_TAG, sqsStdClient, sqsConfig);
+  sqsConfig->SetLargePayloadSupportDisabled();
+
+  Aws::String queueUrl = CreateQueue (sqsClient, SMALLMESSAGE_WITHLARGEPAYLOADSUPPORTEDISABLED_QUEUENAME);
+
+  // prepare a small payload
+  Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody (QUEUE_SIZE_LIMIT - 1000);
+
+  // send message
+  SendMessageOutcome sendM = ExtendedQueueOperationTest::SendMessage (sqsClient, queueUrl, messageBody);
+  ASSERT_TRUE(sendM.IsSuccess ());
+  EXPECT_TRUE(sendM.GetResult ().GetMessageId ().length () > 0);
+
+  // receive message
+  ReceiveMessageOutcome receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  ASSERT_TRUE(receiveM.IsSuccess ());
+  ASSERT_EQ(1uL, receiveM.GetResult ().GetMessages ().size ());
+  EXPECT_EQ(messageBody, receiveM.GetResult ().GetMessages ()[0].GetBody ());
+
+  // check if s3 was used. It must not!
+  Aws::String receiptHandle = receiveM.GetResult ().GetMessages ()[0].GetReceiptHandle ();
+  ASSERT_FALSE(receiptHandle.find (S3_BUCKET_NAME_MARKER) != std::string::npos);
+  ASSERT_FALSE(receiptHandle.find (S3_KEY_MARKER) != std::string::npos);
+
+  // delete message
+  DeleteMessageOutcome deleteM = ExtendedQueueOperationTest::DeleteMessage (sqsClient, queueUrl, receiptHandle);
+  ASSERT_TRUE(deleteM.IsSuccess ());
+  receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  EXPECT_EQ(0uL, receiveM.GetResult ().GetMessages ().size ());
+
+  // delete queue
+  DeleteQueueOutcome deleteQ = DeleteQueue(sqsClient, queueUrl);
+  ASSERT_TRUE(deleteQ.IsSuccess());
 }
+
 
 TEST_F(ExtendedQueueOperationTest, TestLargeMessageWithLargePayloadSupportDisabled)
 {
+  // build an extended sqs config, an extended sqs client and a queue
+  auto sqsConfig = Aws::MakeShared<SQSExtendedClientConfiguration> (ALLOCATION_TAG);
+
+  std::shared_ptr<SQSClient> sqsClient = Aws::MakeShared<SQSExtendedClient> (ALLOCATION_TAG, sqsStdClient, sqsConfig);
+  sqsConfig->SetLargePayloadSupportDisabled();
+
+  Aws::String queueUrl = CreateQueue (sqsClient, LARGEMESSAGE_WITHLARGEPAYLOADSUPPORTEDISABLED_QUEUENAME);
+
+  // prepare a large payload
   Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody (QUEUE_SIZE_LIMIT + 1000);
 
-  // TODO: turnoff payload support
-
-  SendMessageOutcome send = ExtendedQueueOperationTest::SendMessage (messageBody);
-  SQSErrors error = send.GetError ().GetErrorType ();
+  // send message
+  SendMessageOutcome sendM = ExtendedQueueOperationTest::SendMessage (sqsClient, queueUrl, messageBody);
+  SQSErrors error = sendM.GetError ().GetErrorType ();
   EXPECT_TRUE(SQSErrors::INVALID_PARAMETER_VALUE == error);
 
-  // TODO: see if s3bucket was used, it must not!
-
-  Aws::String errorMessage = send.GetError ().GetMessage ();
+  Aws::String errorMessage = sendM.GetError ().GetMessage ();
   EXPECT_TRUE(errorMessage.find (std::to_string (QUEUE_SIZE_LIMIT).c_str ()) != std::string::npos);
   // GetMessage(): One or more parameters are invalid. Reason: Message must be shorter than 262144 bytes.
+
+  // delete queue
+  DeleteQueueOutcome deleteQ = DeleteQueue(sqsClient, queueUrl);
+  ASSERT_TRUE(deleteQ.IsSuccess());
 }
 
-TEST_F(ExtendedQueueOperationTest, TestSendReceiveSmallMessageWithAlwaysThroughS3Enabled)
+TEST_F(ExtendedQueueOperationTest, TestSmallMessageWithAlwaysThroughS3Enabled)
 {
+  // build a bucket, an extended sqs config, an extended sqs client a queue and message body
+  Aws::String s3BucketName = accountId + "_" + SMALLMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_BUCKET + "_" + timeStamp;
+  CreateBucket(s3Client, s3BucketName);
+
+  auto sqsConfig = Aws::MakeShared<SQSExtendedClientConfiguration> (ALLOCATION_TAG);
+  sqsConfig->SetLargePayloadSupportEnabled(s3Client, s3BucketName);
+  sqsConfig->SetAlwaysThroughS3Enabled();
+
+  std::shared_ptr<SQSClient> sqsClient = Aws::MakeShared<SQSExtendedClient> (ALLOCATION_TAG, sqsStdClient, sqsConfig);
+
+  Aws::String queueUrl = CreateQueue (sqsClient, SMALLMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_QUEUENAME);
+
+  // prepare a large payload
+  Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody (QUEUE_SIZE_LIMIT - 1000);
+
+  // send message
+  SendMessageOutcome sendM = ExtendedQueueOperationTest::SendMessage (sqsClient, queueUrl, messageBody);
+  ASSERT_TRUE(sendM.IsSuccess ());
+  EXPECT_TRUE(sendM.GetResult ().GetMessageId ().length () > 0);
+
+  // receive message
+  ReceiveMessageOutcome receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  ASSERT_TRUE(receiveM.IsSuccess ());
+  ASSERT_EQ(1uL, receiveM.GetResult ().GetMessages ().size ());
+  EXPECT_EQ(messageBody, receiveM.GetResult ().GetMessages ()[0].GetBody ());
+
+  // check if s3 was used. It must!
+  Aws::String receiptHandle = receiveM.GetResult ().GetMessages ()[0].GetReceiptHandle ();
+  ASSERT_TRUE(receiptHandle.find (S3_BUCKET_NAME_MARKER) != std::string::npos);
+  ASSERT_TRUE(receiptHandle.find (S3_KEY_MARKER) != std::string::npos);
+
+  // delete message
+  DeleteMessageOutcome deleteM = ExtendedQueueOperationTest::DeleteMessage (sqsClient, queueUrl, receiptHandle);
+  ASSERT_TRUE(deleteM.IsSuccess ());
+  receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  EXPECT_EQ(0uL, receiveM.GetResult ().GetMessages ().size ());
+
+  // check if s3key was removed
+  Aws::String s3BucketNameToTest = ExtendedQueueOperationTest::GetFromReceiptHandleByMarker(receiptHandle, S3_BUCKET_NAME_MARKER);
+  Aws::String s3KeyToTest = ExtendedQueueOperationTest::GetFromReceiptHandleByMarker(receiptHandle, S3_KEY_MARKER);
+  HeadObjectRequest headObjectRequest;
+  headObjectRequest.SetBucket(s3BucketNameToTest);
+  headObjectRequest.SetKey(s3KeyToTest);
+  HeadObjectOutcome headObjectOutcome = s3Client->HeadObject(headObjectRequest);
+  ASSERT_FALSE(headObjectOutcome.IsSuccess());
+
+  // delete queue
+  DeleteQueueOutcome deleteQ = DeleteQueue(sqsClient, queueUrl);
+  ASSERT_TRUE(deleteQ.IsSuccess());
+
+  //delete bucket
+  DeleteBucketOutcome deleteB = DeleteBucket(s3Client, s3BucketName);
+  ASSERT_TRUE(deleteB.IsSuccess());
 }
 
-TEST_F(ExtendedQueueOperationTest, TestSendReceiveLargeMessageWithAlwaysThroughS3Enabled)
+TEST_F(ExtendedQueueOperationTest, TestLargeMessageWithAlwaysThroughS3Enabled)
 {
+  // build a bucket, an extended sqs config, an extended sqs client a queue and message body
+  Aws::String s3BucketName = accountId + "_" + LARGEMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_BUCKET + "_" + timeStamp;
+  CreateBucket(s3Client, s3BucketName);
+
+  auto sqsConfig = Aws::MakeShared<SQSExtendedClientConfiguration> (ALLOCATION_TAG);
+  sqsConfig->SetLargePayloadSupportEnabled(s3Client, s3BucketName);
+  sqsConfig->SetAlwaysThroughS3Enabled();
+
+  std::shared_ptr<SQSClient> sqsClient = Aws::MakeShared<SQSExtendedClient> (ALLOCATION_TAG, sqsStdClient, sqsConfig);
+
+  Aws::String queueUrl = CreateQueue (sqsClient, LARGEMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_QUEUENAME);
+
+  // prepare a large payload
+  Aws::String messageBody = ExtendedQueueOperationTest::GenerateMessageBody (QUEUE_SIZE_LIMIT + 1000);
+
+  // send message
+  SendMessageOutcome sendM = ExtendedQueueOperationTest::SendMessage (sqsClient, queueUrl, messageBody);
+  ASSERT_TRUE(sendM.IsSuccess ());
+  EXPECT_TRUE(sendM.GetResult ().GetMessageId ().length () > 0);
+
+  // receive message
+  ReceiveMessageOutcome receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  ASSERT_TRUE(receiveM.IsSuccess ());
+  ASSERT_EQ(1uL, receiveM.GetResult ().GetMessages ().size ());
+  EXPECT_EQ(messageBody, receiveM.GetResult ().GetMessages ()[0].GetBody ());
+
+  // check if s3 was used. It must!
+  Aws::String receiptHandle = receiveM.GetResult ().GetMessages ()[0].GetReceiptHandle ();
+  ASSERT_TRUE(receiptHandle.find (S3_BUCKET_NAME_MARKER) != std::string::npos);
+  ASSERT_TRUE(receiptHandle.find (S3_KEY_MARKER) != std::string::npos);
+
+  // delete message
+  DeleteMessageOutcome deleteM = ExtendedQueueOperationTest::DeleteMessage (sqsClient, queueUrl, receiptHandle);
+  ASSERT_TRUE(deleteM.IsSuccess ());
+  receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  EXPECT_EQ(0uL, receiveM.GetResult ().GetMessages ().size ());
+
+  // check if s3key was removed
+  Aws::String s3BucketNameToTest = ExtendedQueueOperationTest::GetFromReceiptHandleByMarker(receiptHandle, S3_BUCKET_NAME_MARKER);
+  Aws::String s3KeyToTest = ExtendedQueueOperationTest::GetFromReceiptHandleByMarker(receiptHandle, S3_KEY_MARKER);
+  HeadObjectRequest headObjectRequest;
+  headObjectRequest.SetBucket(s3BucketNameToTest);
+  headObjectRequest.SetKey(s3KeyToTest);
+  HeadObjectOutcome headObjectOutcome = s3Client->HeadObject(headObjectRequest);
+  ASSERT_FALSE(headObjectOutcome.IsSuccess());
+
+  // delete queue
+  DeleteQueueOutcome deleteQ = DeleteQueue(sqsClient, queueUrl);
+  ASSERT_TRUE(deleteQ.IsSuccess());
+
+  //delete bucket
+  DeleteBucketOutcome deleteB = DeleteBucket(s3Client, s3BucketName);
+  ASSERT_TRUE(deleteB.IsSuccess());
 }
 
-TEST_F(ExtendedQueueOperationTest, TestSendReceiveBatchMessagesWithRamdomPayloadSizeAndLargePayloadSupportEnabled)
+/*
+TEST_F(ExtendedQueueOperationTest, TestBatchMessagesWithRamdomPayloadSizeAndLargePayloadSupportEnabled)
 {
 }
 */

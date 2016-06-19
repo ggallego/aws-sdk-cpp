@@ -52,6 +52,7 @@
 #include <aws/sqs/extendedlib/SQSLargeMessageS3Pointer.h>
 #include <aws/s3/model/PutObjectRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
+#include <aws/s3/model/DeleteObjectRequest.h>
 #include <aws/core/utils/json/JsonSerializer.h>
 
 using namespace Aws;
@@ -111,7 +112,8 @@ SQSExtendedClient::ReceiveMessage(const ReceiveMessageRequest& request) const
     {
 
       Aws::Map<Aws::String, MessageAttributeValue> messageAttributes = message.GetMessageAttributes();
-      if (messageAttributes.find(RESERVED_ATTRIBUTE_NAME) != messageAttributes.end()) {
+      if (messageAttributes.find(RESERVED_ATTRIBUTE_NAME) != messageAttributes.end())
+        {
 
           Aws::String messageBody = message.GetBody();
 
@@ -142,7 +144,7 @@ SQSExtendedClient::ReceiveMessage(const ReceiveMessageRequest& request) const
               + message.GetReceiptHandle();
 
           message.SetReceiptHandle(receiptHandle);
-      }
+        }
 
       rebuildedMessages.push_back(message);
 
@@ -152,22 +154,46 @@ SQSExtendedClient::ReceiveMessage(const ReceiveMessageRequest& request) const
   return ReceiveMessageOutcome(result);
 }
 
-DeleteMessageOutcome SQSExtendedClient::DeleteMessage(const DeleteMessageRequest& request) const
+DeleteMessageOutcome
+SQSExtendedClient::DeleteMessage(const DeleteMessageRequest& request) const
 {
   if (!sqsConfig->IsLargePayloadSupportEnabled())
     return SQSClient::DeleteMessage(request);
 
-//  Aws::String receiptHandle = request.GetReceiptHandle();
-//  Aws::String origReceiptHandle = receiptHandle;
-//  if (SQSExtendedClient::IsS3ReceiptHandle(receiptHandle)) {
-//    SQSExtendedClient::deleteMessagePayloadFromS3(receiptHandle);
-//    origReceiptHandle = SQSExtendedClient::GetOrigReceiptHandle(receiptHandle);
-//  }
-//  request.SetReceiptHandle(origReceiptHandle);
+  Aws::String receiptHandle = request.GetReceiptHandle();
+  if (receiptHandle.find (S3_BUCKET_NAME_MARKER) != std::string::npos && receiptHandle.find (S3_KEY_MARKER) != std::string::npos)
+    {
+      Aws::String s3BucketName = SQSExtendedClient::GetFromReceiptHandleByMarker(receiptHandle, S3_BUCKET_NAME_MARKER);
+      Aws::String s3Key = SQSExtendedClient::GetFromReceiptHandleByMarker(receiptHandle, S3_KEY_MARKER);
+
+      DeleteObjectRequest deleteObjectRequest;
+      deleteObjectRequest.SetBucket(s3BucketName);
+      deleteObjectRequest.SetKey(s3Key);
+      sqsConfig->GetS3Client()->DeleteObject(deleteObjectRequest);
+
+      int lastOccurence = receiptHandle.rfind(S3_KEY_MARKER);
+      Aws::String cleannedReceiptHandle = receiptHandle.substr(lastOccurence + std::string(S3_KEY_MARKER).length());
+
+      DeleteMessageRequest reqWithS3Support = request;
+      reqWithS3Support.SetReceiptHandle(cleannedReceiptHandle);
+
+      return SQSClient::DeleteMessage(reqWithS3Support);
+    }
+
   return SQSClient::DeleteMessage(request);
 }
 
+// TODO: so vai faltar os batches
+
 // ---
+
+Aws::String
+SQSExtendedClient::GetFromReceiptHandleByMarker(const Aws::String receiptHandle, const Aws::String marker) const {
+  int firstOccurence = receiptHandle.find(marker);
+  int secondOccurence = receiptHandle.find(marker, firstOccurence + 1);
+  int receiptHandleLenght = secondOccurence - firstOccurence - marker.length();
+  return receiptHandle.substr(firstOccurence + marker.length(), receiptHandleLenght);
+}
 
 bool
 SQSExtendedClient::IsLargeMessage (const SendMessageRequest& request) const

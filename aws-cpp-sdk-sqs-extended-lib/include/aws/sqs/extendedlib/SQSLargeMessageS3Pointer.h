@@ -13,8 +13,9 @@
  * permissions and limitations under the License.
  */
 #pragma once
-#include <aws/sqs/SQS_EXPORTS.h>
 #include <aws/core/utils/memory/stl/AWSString.h>
+#include <aws/core/utils/json/JsonSerializer.h>
+#include <aws/sqs/SQS_EXPORTS.h>
 
 namespace Aws
 {
@@ -34,37 +35,94 @@ namespace Aws
       class AWS_SQS_API SQSLargeMessageS3Pointer
       {
 
+      private:
+        Aws::String m_s3BucketName;
+        bool m_s3BucketNameHasBeenSet;
+        Aws::String m_s3Key;
+        bool m_s3KeyHasBeenSet;
+
       public:
         SQSLargeMessageS3Pointer ();
         SQSLargeMessageS3Pointer (const Aws::Utils::Json::JsonValue& jsonValue);
         SQSLargeMessageS3Pointer& operator= (const Aws::Utils::Json::JsonValue& jsonValue);
         Aws::Utils::Json::JsonValue Jsonize () const;
 
-        inline const Aws::String& GetS3BucketName () const { return m_s3BucketName; }
+        inline const Aws::String& GetS3BucketName () const
+        {
+          return m_s3BucketName;
+        }
 
-        inline void SetS3BucketName (const Aws::String& s3BucketName) { m_s3BucketNameHasBeenSet = true; m_s3BucketName = s3BucketName; }
-        inline void SetS3BucketName (Aws::String&& s3BucketName) { m_s3BucketNameHasBeenSet = true; m_s3BucketName = s3BucketName; }
-        inline void SetS3BucketName (const char* s3BucketName) { m_s3BucketNameHasBeenSet = true; m_s3BucketName.assign(s3BucketName); }
+        inline void SetS3BucketName (const Aws::String& s3BucketName)
+        {
+          m_s3BucketNameHasBeenSet = true;
+          m_s3BucketName = s3BucketName;
+        }
+        inline void SetS3BucketName (Aws::String&& s3BucketName)
+        {
+          m_s3BucketNameHasBeenSet = true;
+          m_s3BucketName = s3BucketName;
+        }
+        inline void SetS3BucketName (const char* s3BucketName)
+        {
+          m_s3BucketNameHasBeenSet = true;
+          m_s3BucketName.assign (s3BucketName);
+        }
 
-        inline SQSLargeMessageS3Pointer& WithS3BucketName (const Aws::String& s3BucketName) { SetS3BucketName (s3BucketName); return *this; }
-        inline SQSLargeMessageS3Pointer& WithS3BucketName (Aws::String&& s3BucketName)  { SetS3BucketName (s3BucketName); return *this; }
-        inline SQSLargeMessageS3Pointer& WithS3BucketName (const char* s3BucketName) { SetS3BucketName (s3BucketName); return *this; }
+        inline SQSLargeMessageS3Pointer& WithS3BucketName (const Aws::String& s3BucketName)
+        {
+          SetS3BucketName (s3BucketName);
+          return *this;
+        }
+        inline SQSLargeMessageS3Pointer& WithS3BucketName (Aws::String&& s3BucketName)
+        {
+          SetS3BucketName (s3BucketName);
+          return *this;
+        }
+        inline SQSLargeMessageS3Pointer& WithS3BucketName (const char* s3BucketName)
+        {
+          SetS3BucketName (s3BucketName);
+          return *this;
+        }
 
-        inline const Aws::String& GetS3Key () const { return m_s3Key; }
+        inline const Aws::String& GetS3Key () const
+        {
+          return m_s3Key;
+        }
 
-        inline void SetS3Key (const Aws::String& s3Key) { m_s3KeyHasBeenSet = true; m_s3Key = s3Key; }
-        inline void SetS3Key (Aws::String&& s3Key) { m_s3KeyHasBeenSet = true; m_s3Key = s3Key; }
-        inline void SetS3Key (const char* s3Key) { m_s3KeyHasBeenSet = true; m_s3Key.assign (s3Key); }
+        inline void SetS3Key (const Aws::String& s3Key)
+        {
+          m_s3KeyHasBeenSet = true;
+          m_s3Key = s3Key;
+        }
+        inline void SetS3Key (Aws::String&& s3Key)
+        {
+          m_s3KeyHasBeenSet = true;
+          m_s3Key = s3Key;
+        }
+        inline void SetS3Key (const char* s3Key)
+        {
+          m_s3KeyHasBeenSet = true;
+          m_s3Key.assign (s3Key);
+        }
 
-        inline SQSLargeMessageS3Pointer& WithS3Key (const Aws::String& s3Key) { SetS3Key (s3Key); return *this; }
-        inline SQSLargeMessageS3Pointer& WithS3Key (Aws::String&& s3Key) { SetS3Key (s3Key); return *this; }
-        inline SQSLargeMessageS3Pointer& WithS3Key (const char* s3Key) { SetS3Key (s3Key); return *this; }
+        inline SQSLargeMessageS3Pointer& WithS3Key (const Aws::String& s3Key)
+        {
+          SetS3Key (s3Key);
+          return *this;
+        }
 
-      private:
-        Aws::String m_s3BucketName;
-        bool m_s3BucketNameHasBeenSet;
-        Aws::String m_s3Key;
-        bool m_s3KeyHasBeenSet;
+        inline SQSLargeMessageS3Pointer& WithS3Key (Aws::String&& s3Key)
+        {
+          SetS3Key (s3Key);
+          return *this;
+        }
+
+        inline SQSLargeMessageS3Pointer& WithS3Key (const char* s3Key)
+        {
+          SetS3Key (s3Key);
+          return *this;
+        }
+
       };
 
     } // namespace Model

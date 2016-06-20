@@ -31,6 +31,8 @@
 #include <aws/sqs/model/SetQueueAttributesRequest.h>
 #include <aws/sqs/model/AddPermissionRequest.h>
 #include <aws/sqs/model/RemovePermissionRequest.h>
+#include <aws/sqs/model/DeleteMessageBatchRequest.h>
+#include <aws/sqs/model/DeleteMessageBatchRequestEntry.h>
 #include <aws/sqs/model/ListDeadLetterSourceQueuesRequest.h>
 #include <aws/s3/model/CreateBucketRequest.h>
 #include <aws/s3/model/DeleteBucketRequest.h>
@@ -50,6 +52,8 @@
 
 #include <aws/sqs/extendedlib/SQSExtendedClient.h>
 #include <aws/sqs/extendedlib/SQSExtendedClientConfiguration.h>
+
+#include <math.h>
 
 using namespace Aws;
 using namespace Aws::Http;
@@ -86,6 +90,8 @@ static const char* SMALLMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_QUEUENAME = "SmallMe
 static const char* LARGEMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_BUCKET = "LargeMessageWithAllwaysThroughS3Enabled";
 static const char* LARGEMESSAGE_WITHALLWAYSTHROUGHS3ENABLED_QUEUENAME = "LargeMessageWithAllwaysThroughS3Enabled";
 
+static const char* RANDOMBATCHMESSAGES_BUCKET = "RamdomBatchMessages";
+static const char* RANDOMBATCHMESSAGES_QUEUENAME = "RamdomBatchMessages";
 
 namespace
 {
@@ -546,8 +552,86 @@ TEST_F(ExtendedQueueOperationTest, TestLargeMessageWithAlwaysThroughS3Enabled)
   ASSERT_TRUE(deleteB.IsSuccess());
 }
 
-/*
-TEST_F(ExtendedQueueOperationTest, TestBatchMessagesWithRamdomPayloadSizeAndLargePayloadSupportEnabled)
+TEST_F(ExtendedQueueOperationTest, TestBatchMessagesWithRamdomPayloadSize)
 {
+  // build a bucket, an extended sqs config, an extended sqs client a queue and message body
+  Aws::String s3BucketName = accountId + "_" + RANDOMBATCHMESSAGES_BUCKET + "_" + timeStamp;
+  CreateBucket(s3Client, s3BucketName);
+
+  auto sqsConfig = Aws::MakeShared<SQSExtendedClientConfiguration> (ALLOCATION_TAG);
+  sqsConfig->SetLargePayloadSupportEnabled(s3Client, s3BucketName);
+
+  std::shared_ptr<SQSClient> sqsClient = Aws::MakeShared<SQSExtendedClient> (ALLOCATION_TAG, sqsStdClient, sqsConfig);
+
+  Aws::String queueUrl = CreateQueue (sqsClient, RANDOMBATCHMESSAGES_QUEUENAME);
+
+  unsigned numberOfMessages = 4;
+
+  // create sendBatchEntries
+  Aws::Vector<SendMessageBatchRequestEntry> sendBatchEntries;
+  for (unsigned i = 1; i <= numberOfMessages; i++)
+  {
+    SendMessageBatchRequestEntry entry;
+    String messageBody = ExtendedQueueOperationTest::GenerateMessageBody(pow(100,i));
+    entry.SetMessageBody(messageBody);
+    entry.SetId(std::to_string(i).c_str ());
+    sendBatchEntries.push_back(entry);
+  }
+
+  // send messages
+  SendMessageBatchRequest sendMessageBatchRequest;
+  sendMessageBatchRequest.SetQueueUrl(queueUrl);
+  sendMessageBatchRequest.SetEntries(sendBatchEntries);
+  SendMessageBatchOutcome sendM = sqsClient->SendMessageBatch(sendMessageBatchRequest);
+  ASSERT_TRUE(sendM.IsSuccess());
+  ASSERT_EQ(numberOfMessages, sendM.GetResult().GetSuccessful().size());
+
+  // receive messages
+  ReceiveMessageRequest receiveMessageRequest;
+  receiveMessageRequest.SetQueueUrl(queueUrl);
+  receiveMessageRequest.SetMaxNumberOfMessages(numberOfMessages);
+  Vector<Message> messages;
+  for (unsigned i = 1; i <= numberOfMessages; i++)
+  {
+    auto receiveM = sqsClient->ReceiveMessage(receiveMessageRequest);
+    ASSERT_TRUE(receiveM.IsSuccess());
+    for (auto& message : receiveM.GetResult().GetMessages())
+    {
+      if (i >= 3) {
+        Aws::String receiptHandle = message.GetReceiptHandle ();
+        ASSERT_TRUE(receiptHandle.find (S3_BUCKET_NAME_MARKER) != std::string::npos);
+        ASSERT_TRUE(receiptHandle.find (S3_KEY_MARKER) != std::string::npos);
+      }
+      messages.push_back(message);
+    }
+  }
+  ASSERT_EQ(numberOfMessages, messages.size());
+
+  // create deleteBatchEntries
+  Aws::Vector<DeleteMessageBatchRequestEntry> deleteBatchEntries;
+  for (unsigned i = 1; i <= numberOfMessages; i++)
+  {
+    DeleteMessageBatchRequestEntry entry;
+    entry.SetReceiptHandle (messages[i-1].GetReceiptHandle ());
+    entry.SetId(std::to_string(i).c_str ());
+    deleteBatchEntries.push_back(entry);
+  }
+
+  // delete messages
+  DeleteMessageBatchRequest deleteMessageBatchRequest;
+  deleteMessageBatchRequest.SetQueueUrl(queueUrl);
+  deleteMessageBatchRequest.SetEntries(deleteBatchEntries);
+  DeleteMessageBatchOutcome deleteM = sqsClient->DeleteMessageBatch(deleteMessageBatchRequest);
+  ASSERT_TRUE(deleteM.IsSuccess());
+  ReceiveMessageOutcome receiveM = ExtendedQueueOperationTest::ReceiveMessage (sqsClient, queueUrl);
+  EXPECT_EQ(0uL, receiveM.GetResult ().GetMessages ().size ());
+
+  // delete queue
+  DeleteQueueOutcome deleteQ = DeleteQueue(sqsClient, queueUrl);
+  ASSERT_TRUE(deleteQ.IsSuccess());
+
+  //delete bucket
+  DeleteBucketOutcome deleteB = DeleteBucket(s3Client, s3BucketName);
+  ASSERT_TRUE(deleteB.IsSuccess());
 }
-*/
+

@@ -34,10 +34,13 @@ namespace Aws
         std::shared_ptr<SQS::SQSClient> sqsClient;
         std::shared_ptr<SQSExtendedClientConfiguration> sqsConfig;
 
-        virtual bool IsLargeMessage (const Model::SendMessageRequest& request) const;
+        virtual Aws::String RandomizedS3Key() const;
         virtual unsigned GetMsgAttributesSize(const Aws::Map<Aws::String, Model::MessageAttributeValue>& messageAttributes) const;
-        virtual Model::SendMessageRequest StoreMessageInS3 (const Model::SendMessageRequest& request) const;
         virtual Aws::String GetFromReceiptHandleByMarker(const Aws::String receiptHandle, const Aws::String marker) const;
+        virtual bool IsLargeMessage (const Model::SendMessageRequest& request) const;
+        virtual bool IsLargeMessageBatch (const Model::SendMessageBatchRequestEntry& request) const;
+        virtual Model::SendMessageRequest StoreMessageInS3 (const Model::SendMessageRequest& request) const;
+        virtual Model::SendMessageBatchRequestEntry StoreMessageBatchInS3 (const Model::SendMessageBatchRequestEntry& request) const;
 
       public:
         SQSExtendedClient (const std::shared_ptr<SQSClient>& client,
@@ -46,6 +49,8 @@ namespace Aws
         virtual Model::SendMessageOutcome SendMessage (const Model::SendMessageRequest& request) const;
         virtual Model::ReceiveMessageOutcome ReceiveMessage(const Model::ReceiveMessageRequest& request) const;
         virtual Model::DeleteMessageOutcome DeleteMessage(const Model::DeleteMessageRequest& request) const;
+        virtual Model::SendMessageBatchOutcome SendMessageBatch(const Model::SendMessageBatchRequest& request) const;
+        virtual Model::DeleteMessageBatchOutcome DeleteMessageBatch(const Model::DeleteMessageBatchRequest& request) const;
 
       };
 

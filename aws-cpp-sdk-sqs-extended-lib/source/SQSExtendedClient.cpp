@@ -114,7 +114,6 @@ SQSExtendedClient::ReceiveMessage(const ReceiveMessageRequest& request) const
       Aws::Map<Aws::String, MessageAttributeValue> messageAttributes = message.GetMessageAttributes();
       if (messageAttributes.find(RESERVED_ATTRIBUTE_NAME) != messageAttributes.end())
         {
-
           Aws::String messageBody = message.GetBody();
 
           // unjsonize object
@@ -183,9 +182,103 @@ SQSExtendedClient::DeleteMessage(const DeleteMessageRequest& request) const
   return SQSClient::DeleteMessage(request);
 }
 
-// TODO: so vai faltar os batches
+SendMessageBatchOutcome
+SQSExtendedClient::SendMessageBatch(const SendMessageBatchRequest& request) const
+{
+  if (!sqsConfig->IsLargePayloadSupportEnabled ())
+    return SQSClient::SendMessageBatch (request);
+
+  Aws::Vector<SendMessageBatchRequestEntry> batchEntries;
+  for (SendMessageBatchRequestEntry entry : request.GetEntries())
+  {
+    if (sqsConfig->IsAlwaysThroughS3 () || SQSExtendedClient::IsLargeMessageBatch (entry)) {
+      SendMessageBatchRequestEntry entryWithS3Support = SQSExtendedClient::StoreMessageBatchInS3 (entry);
+      batchEntries.push_back(entryWithS3Support);
+    } else {
+      batchEntries.push_back(entry);
+    }
+  }
+  SendMessageBatchRequest reqWithS3Support = request;
+  reqWithS3Support.SetEntries(batchEntries);
+
+  return SQSClient::SendMessageBatch (reqWithS3Support);
+}
+
+DeleteMessageBatchOutcome
+SQSExtendedClient::DeleteMessageBatch(const DeleteMessageBatchRequest& request) const
+{
+  if (!sqsConfig->IsLargePayloadSupportEnabled())
+    return SQSClient::DeleteMessageBatch(request);
+
+  Aws::Vector<DeleteMessageBatchRequestEntry> batchEntries;
+  for (auto entry : request.GetEntries())
+  {
+    Aws::String receiptHandle = entry.GetReceiptHandle();
+    if (receiptHandle.find (S3_BUCKET_NAME_MARKER) != std::string::npos && receiptHandle.find (S3_KEY_MARKER) != std::string::npos)
+      {
+        Aws::String s3BucketName = SQSExtendedClient::GetFromReceiptHandleByMarker(receiptHandle, S3_BUCKET_NAME_MARKER);
+        Aws::String s3Key = SQSExtendedClient::GetFromReceiptHandleByMarker(receiptHandle, S3_KEY_MARKER);
+
+        DeleteObjectRequest deleteObjectRequest;
+        deleteObjectRequest.SetBucket(s3BucketName);
+        deleteObjectRequest.SetKey(s3Key);
+        sqsConfig->GetS3Client()->DeleteObject(deleteObjectRequest);
+
+        int lastOccurence = receiptHandle.rfind(S3_KEY_MARKER);
+        Aws::String cleannedReceiptHandle = receiptHandle.substr(lastOccurence + std::string(S3_KEY_MARKER).length());
+
+        DeleteMessageBatchRequestEntry entryWithS3Support = entry;
+        entryWithS3Support.SetReceiptHandle(cleannedReceiptHandle);
+
+        batchEntries.push_back(entryWithS3Support);
+      }
+    else
+      {
+        batchEntries.push_back(entry);
+      }
+  }
+  DeleteMessageBatchRequest reqWithS3Support = request;
+  reqWithS3Support.SetEntries(batchEntries);
+
+  return SQSClient::DeleteMessageBatch (reqWithS3Support);
+
+}
 
 // ---
+
+// TODO: Need to find a good UUID, until there simple randomize it with rand()
+Aws::String SQSExtendedClient::RandomizedS3Key() const
+{
+  srand(time(NULL));
+  Aws::String randomizedS3Key = RESERVED_ATTRIBUTE_NAME;
+  for (int i = 0; i < 20; ++i)
+  {
+      randomizedS3Key += static_cast<char>('a' + rand() % 26);
+  }
+  return randomizedS3Key.c_str();
+  //return RESERVED_ATTRIBUTE_NAME + Utils::DateTime::Now().CalculateLocalTimestampAsString("%Y%m%dt%H%M%Sz");
+}
+
+unsigned
+SQSExtendedClient::GetMsgAttributesSize (
+    const Aws::Map<Aws::String, Model::MessageAttributeValue>& messageAttributes) const
+{
+  unsigned size = 0;
+
+  for (auto attribute : messageAttributes)
+    {
+      Aws::String key = attribute.first;
+      Model::MessageAttributeValue value = attribute.second;
+
+      // TODO: Test this with care
+      size += key.size ();
+      size += value.GetDataType ().size ();
+      size += value.GetStringValue ().size ();
+      size += value.GetBinaryValue ().GetLength ();
+    }
+
+  return size;
+}
 
 Aws::String
 SQSExtendedClient::GetFromReceiptHandleByMarker(const Aws::String receiptHandle, const Aws::String marker) const {
@@ -204,12 +297,20 @@ SQSExtendedClient::IsLargeMessage (const SendMessageRequest& request) const
   return (totalMsgSize > sqsConfig->GetMessageSizeThreshold ());
 }
 
+bool
+SQSExtendedClient::IsLargeMessageBatch (const SendMessageBatchRequestEntry& request) const
+{
+  unsigned msgAttributesSize = SQSExtendedClient::GetMsgAttributesSize (request.GetMessageAttributes ());
+  unsigned msgBodySize = request.GetMessageBody ().size ();
+  unsigned totalMsgSize = msgAttributesSize + msgBodySize;
+  return (totalMsgSize > sqsConfig->GetMessageSizeThreshold ());
+}
+
 SendMessageRequest SQSExtendedClient::StoreMessageInS3 (const SendMessageRequest& request) const
 {
   SendMessageRequest reqWithS3Support = request;
 
-  // UUID.randomUUID ().toString ();
-  Aws::String s3Key = RESERVED_ATTRIBUTE_NAME + Utils::DateTime::Now().CalculateLocalTimestampAsString("%Y%m%dt%H%M%Sz");
+  Aws::String s3Key = SQSExtendedClient::RandomizedS3Key();
   Aws::String body = reqWithS3Support.GetMessageBody ();
   unsigned size = body.size ();
   std::shared_ptr<Aws::IOStream> bodyAsStream = Aws::MakeShared<Aws::StringStream>(ALLOCATION_TAG);
@@ -240,24 +341,37 @@ SendMessageRequest SQSExtendedClient::StoreMessageInS3 (const SendMessageRequest
   return reqWithS3Support;
 }
 
-unsigned
-SQSExtendedClient::GetMsgAttributesSize (
-    const Aws::Map<Aws::String, Model::MessageAttributeValue>& messageAttributes) const
+SendMessageBatchRequestEntry SQSExtendedClient::StoreMessageBatchInS3 (const SendMessageBatchRequestEntry& request) const
 {
-  unsigned size = 0;
+  SendMessageBatchRequestEntry reqWithS3Support = request;
 
-  for (auto attribute : messageAttributes)
-    {
-      Aws::String key = attribute.first;
-      Model::MessageAttributeValue value = attribute.second;
+  Aws::String s3Key = SQSExtendedClient::RandomizedS3Key();
+  Aws::String body = reqWithS3Support.GetMessageBody ();
+  unsigned size = body.size ();
+  std::shared_ptr<Aws::IOStream> bodyAsStream = Aws::MakeShared<Aws::StringStream>(ALLOCATION_TAG);
+  *bodyAsStream << body;
+  bodyAsStream->flush();
 
-      // TODO: Test this with care
-      size += key.size ();
-      size += value.GetDataType ().size ();
-      size += value.GetStringValue ().size ();
-      size += value.GetBinaryValue ().GetLength ();
-    }
+  // Add message attribute as a flag
+  MessageAttributeValue messageAttributeValue;
+  messageAttributeValue.SetDataType ("Number");
+  messageAttributeValue.SetStringValue (std::to_string (size).c_str ());
+  reqWithS3Support.AddMessageAttributes (RESERVED_ATTRIBUTE_NAME, messageAttributeValue);
 
-  return size;
+  // Upload payload to S3
+  PutObjectRequest putObjectRequest;
+  putObjectRequest.SetBucket(sqsConfig->GetS3BucketName());
+  putObjectRequest.SetKey(s3Key);
+  putObjectRequest.SetBody(bodyAsStream);
+  putObjectRequest.SetContentLength(static_cast<long>(putObjectRequest.GetBody()->tellp()));
+  PutObjectOutcome putObjectOutcome = sqsConfig->GetS3Client()->PutObject(putObjectRequest);
+
+  // Get S3 Handler/Pointer
+  SQSLargeMessageS3Pointer s3Pointer;
+  s3Pointer.SetS3BucketName(sqsConfig->GetS3BucketName());
+  s3Pointer.SetS3Key(s3Key);
+  JsonValue json = s3Pointer.Jsonize();
+  reqWithS3Support.SetMessageBody (json.WriteReadable());
+
+  return reqWithS3Support;
 }
-

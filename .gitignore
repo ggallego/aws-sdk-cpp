@@ -82,14 +82,16 @@ code-generation/generator/target/
 #config output
 aws-cpp-sdk-core/include/aws/core/SDKConfig.h
 
+#nuget
+*.nupkg
+
 #test execution files
 run*IntegrationTests
 run*ManagementTests
 run*UnitTests
 aws_sdk_*.log
 
-#eclipse config files
+#eclipse cdt config files
 .cproject
 .project
 .settings/
-

@@ -14,7 +14,6 @@
  */
 #include <aws/core/utils/memory/stl/AWSStringStream.h>
 #include <aws/core/utils/json/JsonSerializer.h>
-#include <aws/sqs/model/SendMessageBatchRequestEntry.h>
 #include <aws/sqs/extendedlib/SQSExtendedClient.h>
 #include <aws/sqs/extendedlib/SQSExtendedClientConfiguration.h>
 #include <aws/sqs/extendedlib/SQSLargeMessageS3Pointer.h>

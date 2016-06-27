@@ -677,7 +677,7 @@ TEST_F(ExtendedQueueOperationTest, TestBatchMessagesWithRamdomPayloadSize)
   // receive messages
   ReceiveMessageRequest receiveMessageRequest;
   receiveMessageRequest.SetQueueUrl (queueUrl);
-  receiveMessageRequest.SetMaxNumberOfMessages (numberOfMessages);
+  receiveMessageRequest.SetMaxNumberOfMessages (1);
   Vector<Message> messages;
   for (unsigned i = 1; i <= numberOfMessages; i++)
   {
